@@ -1,15 +1,19 @@
-// probot
-
 import { Probot } from "probot";
-import { handlePullRequestEvent } from "./github/webhook";
+import { handlePullRequestEvent } from "./github/webhook.js";
 
-export default (app) => {
-  app.log.info("App is loaded!");
+const app = (app) => {
+  app.log.info("🤖 PR Reviewer App is loaded!");
 
   app.on(
     ["pull_request.opened", "pull_request.synchronize"],
     async (context) => {
-      await handlePullRequestEvent(context);
+      try {
+        await handlePullRequestEvent(context);
+      } catch (error) {
+        app.log.error("Error handling PR event:", error);
+      }
     }
   );
 };
+
+export default app;

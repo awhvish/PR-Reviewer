@@ -1,0 +1,12 @@
+{
+  "action": "opened",
+  "pull_request": {
+    "number": 1,
+    "title": "Test PR for Syntaxis",
+    "user": { "login": "awhvish" }
+  },
+  "repository": {
+    "name": "pr-reviewer",
+    "owner": { "login": "awhvish" }
+  }
+}
