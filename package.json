@@ -2,13 +2,20 @@
   "name": "pr-reviewer",
   "version": "1.0.0",
   "description": "AI-powered PR reviewer bot",
-  "main": "src/index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "probot run ./src/index.js",
-    "dev": "probot run ./src/index.js"
+    "build": "tsc",
+    "start": "npm run build && probot run ./dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "type-check": "tsc --noEmit"
   },
   "type": "module",
   "dependencies": {
     "probot": "^14.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
   }
 }
