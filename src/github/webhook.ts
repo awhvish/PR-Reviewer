@@ -52,7 +52,7 @@ export async function handlePullRequestEvent(
       owner,
       repo,
       issue_number: number,
-      body: "🤖 Sorry, I encountered an error while reviewing this PR. Please try again.",
+      body: "Sorry, I encountered an error while reviewing this PR. Please try again.",
     });
     
     throw error;
