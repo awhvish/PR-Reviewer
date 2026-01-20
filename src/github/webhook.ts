@@ -1,7 +1,14 @@
 import { Context } from "probot";
-import client from "../llm/openai";
+import { openaiProvider } from "../llm/openai";
+import { diffParser } from "../review/diffParser";
+import { ReviewGenerator } from "../review/generator";
+import { githubCommentsHandler } from "./comments";
 
-export async function handlePullRequestEvent(context: Context<"pull_request.opened" | "pull_request.synchronize">): Promise<string> {
+const reviewGenerator = new ReviewGenerator(openaiProvider);
+
+export async function handlePullRequestEvent(
+  context: Context<"pull_request.opened" | "pull_request.synchronize">
+): Promise<string> {
   const { owner, repo } = context.repo();
   const number = context.payload.pull_request.number;
   const prTitle = context.payload.pull_request.title;
@@ -9,47 +16,34 @@ export async function handlePullRequestEvent(context: Context<"pull_request.open
   context.log.info(`Processing PR #${number}: ${prTitle}`);
 
   try {
-    const { data: diffText } = await context.octokit.rest.pulls.get({
-      owner,
-      repo,
-      pull_number: number,
-      headers: {
-        accept: "application/vnd.github.v3.diff", 
-      },
-    }) as unknown as { data: string }; 
+    // Parse the diff
+    const rawDiff = await diffParser.parsePRDiff(context, owner, repo, number);
+    const diff = diffParser.filterSignificantChanges(rawDiff);
 
-    if (typeof diffText !== 'string' || diffText.length === 0) {
-      context.log.info("No diff data returned.");
-      return "No changes found.";
+    if (diff.files.length === 0) {
+      context.log.info(`PR #${number} has no significant changes`);
+      await githubCommentsHandler.postReview(
+        context,
+        {
+          summary: "No significant changes detected.",
+          comments: [],
+          overallRating: 'approve'
+        },
+        owner,
+        repo,
+        number
+      );
+      return "No significant changes to review.";
     }
 
-    const response = await client.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert code reviewer. Focus on bugs, security issues, and significant improvements. Be concise and actionable.",
-        },
-        {
-          role: "user",
-          content: `Please review this code diff and suggest improvements:\n\n${diffText}`,
-        },
-      ],
-      max_tokens: 500,
-      temperature: 0.1, 
-    });
+    // Generate review
+    const review = await reviewGenerator.generateReview(diff, prTitle);
 
-    const reviewComments = response.choices[0].message?.content || "No comments generated.";
-    
-    await context.octokit.rest.issues.createComment({
-      owner,
-      repo,
-      issue_number: number,
-      body: `🤖 **AI Code Review**\n\n${reviewComments}`,
-    });
+    // Post comment
+    await githubCommentsHandler.postReview(context, review, owner, repo, number);
 
     context.log.info(`Posted review for PR #${number}`);
-    return reviewComments;
+    return review.summary;
 
   } catch (error) {
     context.log.error({ error }, "Error in PR review");
@@ -58,7 +52,7 @@ export async function handlePullRequestEvent(context: Context<"pull_request.open
       owner,
       repo,
       issue_number: number,
-      body: "Sorry, I encountered an error while reviewing this PR. Please try again.",
+      body: "🤖 Sorry, I encountered an error while reviewing this PR. Please try again.",
     });
     
     throw error;
