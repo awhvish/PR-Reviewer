@@ -1,14 +1,19 @@
 import SimpleGit from "simple-git";
 import path from 'path';
 import fs from 'fs';
+import { cache } from './cache';
 
 export class RepoCloner {
-    private baseDir = "tmp/repositories/";
+    baseDir = "tmp/repositories/";
+    
 
     async cloneRepository(owner:string, repoName: string, token: string) {
+        
         const repoPath = path.join(this.baseDir, owner, repoName);
 
         try {
+            await cache.cleanupCache(); // Fixed: Added missing await
+            
             if (await this.exists(repoPath)) {
                 console.log(`Repo ${repoName} exists, pulling updates...`)
                 const git = SimpleGit(repoPath);
