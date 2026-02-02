@@ -1,19 +1,8 @@
-import { LLMProvider, ChatMessage } from "../llm/provider.js";
-import { ParsedDiff } from "./diffParser.js";
+import { LLMProvider } from "../llm/provider";
+import { ChatMessage } from "../llm/types";
+import { ParsedDiff, ReviewComment, GeneratedReview } from "./types";
 
-export interface ReviewComment {
-     message: string;
-     confidence: number;
-     severity: "critical" | "warning" | "suggestion";
-     line?: number;
-     filename?: string;
-}
-
-export interface GeneratedReview {
-     summary: string;
-     comments: ReviewComment[];
-     overallRating: "approve" | "request_changes" | "comment";
-}
+export type { ReviewComment, GeneratedReview };
 
 export class ReviewGenerator {
      constructor(private llmProvider: LLMProvider) {}
