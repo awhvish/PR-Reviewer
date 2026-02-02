@@ -1,5 +1,6 @@
 import OpenAI from "openai";
-import { LLMProvider, ChatMessage, ChatOptions, ChatResponse } from "./provider.js";
+import { LLMProvider } from "./provider";
+import { ChatMessage, ChatOptions, ChatResponse } from "./types";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("Missing OPENAI_API_KEY environment variable");
