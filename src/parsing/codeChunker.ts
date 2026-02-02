@@ -1,20 +1,7 @@
-import { ExtractedFeatures } from "./treeSitter";
-import { CallGraphNode } from "./callGraph";
 import crypto from "crypto";
+import { ExtractedFeatures, CallGraphNode, CodeChunk } from "./types";
 
-export interface CodeChunk {
-    id: string;
-    text: string;           // raw code
-    context: string;        //Enriched context
-    filePath: string;
-    startLine: number;
-    endLine: number;
-    metadata: {
-        functionName: string;
-        callCount: number;  // How many other functions does this call?
-        incomingCount: number; // How many functions call this?
-    };
-}
+export type { CodeChunk };
 
 export class CodeChunker {
     

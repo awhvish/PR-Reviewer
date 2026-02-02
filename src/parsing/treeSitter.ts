@@ -2,28 +2,9 @@ import Parser from "tree-sitter";
 import fs from "fs";
 import path from "path";
 import { Query } from "tree-sitter";
+import { ImportInfo, FunctionInfo, ExtractedFeatures } from "./types";
 
-export interface ImportInfo {
-     module: string;    
-     symbols: string[];   
-     isDefault: boolean;  
-}
-
-export interface FunctionInfo {
-     name: string;
-     filePath: string;
-     startLine: number;
-     endLine: number;
-     code: string;
-     calls: string[];       
-}
-
-export interface ExtractedFeatures {
-     filePath: string;
-     language: string;
-     functions: FunctionInfo[];
-     imports: ImportInfo[];
-}
+export type { ImportInfo, FunctionInfo, ExtractedFeatures };
 
 export class TreeSitterParser {
      private GRAMMAR_MAP: Record<string, string> = {

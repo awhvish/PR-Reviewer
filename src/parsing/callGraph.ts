@@ -1,11 +1,7 @@
 import path from "path";
-import { ExtractedFeatures } from "./treeSitter";
+import { ExtractedFeatures, CallGraphNode } from "./types";
 
-export interface CallGraphNode {
-    id: string; // ID for function
-    calls: string[]; // List of IDs this function calls
-    calledBy: string[]; // List of IDs that call tshis function
-}
+export type { CallGraphNode };
 
 export class CallGraphBuilder {
     private nodes = new Map<string, CallGraphNode>();
