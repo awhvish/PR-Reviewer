@@ -145,7 +145,6 @@ export class TreeSitterParser {
           const imports: ImportInfo[] = [];
           const functionCalls = new Map<string, string[]>();
           
-          // Improved State Tracking (Cleaner than 'captures.find')
           let currentScope: string | null = null;
 
           for (const cap of captures) {
@@ -175,11 +174,9 @@ export class TreeSitterParser {
                     calls.push(text);
                     functionCalls.set(currentScope, calls);
                }
-               // --- 4. NEW: Import Extraction Logic ---
                else if (cap.name === "import.src") {
-                    const cleanPath = text.replace(/['"]/g, ""); // Remove quotes
+                    const cleanPath = text.replace(/['"]/g, ""); 
                     
-                    // Heuristic: Check parent node text to find symbols
                     const parentText = cap.node.parent?.text || "";
                     const isDefault = !parentText.includes("{");
                     const symbols: string[] = [];
@@ -208,7 +205,7 @@ export class TreeSitterParser {
                filePath,
                language: path.extname(filePath).substring(1),
                functions,
-               imports // Return the new data
+               imports 
           };
      }
 }
