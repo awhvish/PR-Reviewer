@@ -4,8 +4,12 @@ import { diffParser } from "../review/diffParser";
 import { ReviewGenerator } from "../review/generator";
 import { githubCommentsHandler } from "./comments";
 import { repoCloner } from "../git/cloner";
+import { RepositoryParser } from "../parsing/parser";
+import { CodeChunk } from "../parsing/codeChunker";
+import { storeDocuments } from "../rag/vectorStore";
+import { buildKeywordIndex } from "../rag/bm25";
+import { getHybridRagContext } from "../rag/hybridRetriever";
 
-const reviewGenerator = new ReviewGenerator(openaiProvider);
 
 export async function handlePullRequestEvent(
   context: Context<"pull_request.opened" | "pull_request.synchronize">
@@ -13,6 +17,10 @@ export async function handlePullRequestEvent(
   const { owner: repoOwner, repo: repoName } = context.repo();
   const number = context.payload.pull_request.number;
   const prTitle = context.payload.pull_request.title;
+  const parser = new RepositoryParser();
+  const reviewGenerator = new ReviewGenerator(openaiProvider);
+
+
 
   context.log.info(`Processing PR #${number}: ${prTitle}`);
 
@@ -24,13 +32,31 @@ export async function handlePullRequestEvent(
     // Clone into the repository
     const repoPath = await repoCloner.cloneRepository(repoOwner, repoName, installationToken as string);
 
-    // Parse using tree-sitter
-    //store in vector db
-    //get the PR diff
+    if (!repoPath) {
+      throw new Error("Failed to clone repository");
+    }
 
-    // Parse the diff
+    // parse the repository
+    const parsedFeatures: CodeChunk[] = await parser.parse(repoPath);
+
+    //store in vector db
+    await storeDocuments(parsedFeatures);
+    buildKeywordIndex(parsedFeatures.map(c => ({
+      id: c.id,
+      text: c.text,
+      filePath: c.filePath,
+      functionName: c.metadata.functionName,
+      startLine: c.startLine,
+      endLine: c.endLine
+    })));
+
+
+    // Parse the difference
     const rawDiff = await diffParser.parsePRDiff(context, repoOwner, repoName, number);
     const diff = diffParser.filterSignificantChanges(rawDiff);
+
+    // retrieve relevant code snippets
+    const ragContext = await getHybridRagContext(diff.content, 10, 10);
 
     
     if (diff.files.length === 0) {
@@ -50,7 +76,7 @@ export async function handlePullRequestEvent(
     }
 
     // Generate review
-    const review = await reviewGenerator.generateReview(diff, prTitle);
+    const review = await reviewGenerator.generateReview(diff, prTitle, ragContext);
 
     // Post comment
     await githubCommentsHandler.postReview(context, review, repoOwner, repoName, number);
