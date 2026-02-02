@@ -2,41 +2,45 @@ import { LLMProvider, ChatMessage } from "../llm/provider.js";
 import { ParsedDiff } from "./diffParser.js";
 
 export interface ReviewComment {
-  message: string;
-  confidence: number;
-  severity: 'critical' | 'warning' | 'suggestion';
-  line?: number;
-  filename?: string;
+     message: string;
+     confidence: number;
+     severity: "critical" | "warning" | "suggestion";
+     line?: number;
+     filename?: string;
 }
 
 export interface GeneratedReview {
-  summary: string;
-  comments: ReviewComment[];
-  overallRating: 'approve' | 'request_changes' | 'comment';
+     summary: string;
+     comments: ReviewComment[];
+     overallRating: "approve" | "request_changes" | "comment";
 }
 
 export class ReviewGenerator {
-  constructor(private llmProvider: LLMProvider) {}
+     constructor(private llmProvider: LLMProvider) {}
 
-  async generateReview(diff: ParsedDiff, prTitle: string): Promise<GeneratedReview> {
-    const systemPrompt = this.buildSystemPrompt();
-    const userPrompt = this.buildUserPrompt(diff, prTitle);
+     async generateReview(
+          diff: ParsedDiff,
+          prTitle: string,
+          ragContext?: string,
+     ): Promise<GeneratedReview> {
+          const systemPrompt = this.buildSystemPrompt();
+          const userPrompt = this.buildUserPrompt(diff, prTitle, ragContext);
 
-    const messages: ChatMessage[] = [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ];
+          const messages: ChatMessage[] = [
+               { role: "system", content: systemPrompt },
+               { role: "user", content: userPrompt },
+          ];
 
-    const response = await this.llmProvider.chat(messages, {
-      maxTokens: 800,
-      temperature: 0.1,
-    });
+          const response = await this.llmProvider.chat(messages, {
+               maxTokens: 800,
+               temperature: 0.1,
+          });
 
-    return this.parseReviewResponse(response.content);
-  }
+          return this.parseReviewResponse(response.content);
+     }
 
-  private buildSystemPrompt(): string {
-    return `You are an expert code reviewer. Analyze code changes and provide constructive feedback.
+     private buildSystemPrompt(): string {
+          return `You are an expert code reviewer. Analyze code changes and provide constructive feedback.
 
 Focus on:
 - 🔴 Critical: Security vulnerabilities, logic bugs, breaking changes
@@ -50,10 +54,14 @@ For each issue found, provide:
 4. Suggested fix when applicable
 
 Be concise and actionable. Only flag significant issues.`;
-  }
+     }
 
-  private buildUserPrompt(diff: ParsedDiff, prTitle: string): string {
-    return `Review this pull request:
+     private buildUserPrompt(
+          diff: ParsedDiff,
+          prTitle: string,
+          ragContext?: string,
+     ): string {
+          let prompt = `Review this pull request:
 
 **Title**: ${prTitle}
 
@@ -61,57 +69,70 @@ Be concise and actionable. Only flag significant issues.`;
 - ${diff.additions} additions, ${diff.deletions} deletions
 - ${diff.files.length} files changed
 
-**Diff**:
+${
+     ragContext
+          ? `**Repository Context**:
+${ragContext}
+
+`
+          : ""
+}**Diff**:
 \`\`\`diff
 ${diff.content}
 \`\`\`
 
-Provide your review as structured feedback.`;
-  }
+Provide your review as structured feedback${ragContext ? ", considering the provided repository context for better understanding of the codebase" : ""}.`;
 
-  private parseReviewResponse(content: string): GeneratedReview {
-    // Simple parsing - in production, you'd want structured JSON output
-    const lines = content.split('\n');
-    const comments: ReviewComment[] = [];
-    
-    let currentComment: Partial<ReviewComment> = {};
-    
-    for (const line of lines) {
-      if (line.includes('🔴') || line.includes('CRITICAL')) {
-        if (currentComment.message) comments.push(currentComment as ReviewComment);
-        currentComment = { severity: 'critical', confidence: 85 };
-      } else if (line.includes('🟡') || line.includes('WARNING')) {
-        if (currentComment.message) comments.push(currentComment as ReviewComment);
-        currentComment = { severity: 'warning', confidence: 75 };
-      } else if (line.includes('🔵') || line.includes('SUGGESTION')) {
-        if (currentComment.message) comments.push(currentComment as ReviewComment);
-        currentComment = { severity: 'suggestion', confidence: 65 };
-      } else if (line.trim()) {
-        currentComment.message = (currentComment.message || '') + line + '\n';
-      }
-    }
-    
-    if (currentComment.message) {
-      comments.push(currentComment as ReviewComment);
-    }
+          return prompt;
+     }
 
-    // Determine overall rating
-    const hasCritical = comments.some(c => c.severity === 'critical');
-    const hasWarning = comments.some(c => c.severity === 'warning');
-    
-    let overallRating: 'approve' | 'request_changes' | 'comment';
-    if (hasCritical) {
-      overallRating = 'request_changes';
-    } else if (hasWarning) {
-      overallRating = 'comment';
-    } else {
-      overallRating = 'approve';
-    }
+     private parseReviewResponse(content: string): GeneratedReview {
+          // Simple parsing - in production, you'd want structured JSON output
+          const lines = content.split("\n");
+          const comments: ReviewComment[] = [];
 
-    return {
-      summary: content.substring(0, 200) + '...',
-      comments,
-      overallRating,
-    };
-  }
+          let currentComment: Partial<ReviewComment> = {};
+
+          for (const line of lines) {
+               if (line.includes("🔴") || line.includes("CRITICAL")) {
+                    if (currentComment.message)
+                         comments.push(currentComment as ReviewComment);
+                    currentComment = { severity: "critical", confidence: 85 };
+               } else if (line.includes("🟡") || line.includes("WARNING")) {
+                    if (currentComment.message)
+                         comments.push(currentComment as ReviewComment);
+                    currentComment = { severity: "warning", confidence: 75 };
+               } else if (line.includes("🔵") || line.includes("SUGGESTION")) {
+                    if (currentComment.message)
+                         comments.push(currentComment as ReviewComment);
+                    currentComment = { severity: "suggestion", confidence: 65 };
+               } else if (line.trim()) {
+                    currentComment.message =
+                         (currentComment.message || "") + line + "\n";
+               }
+          }
+
+          if (currentComment.message) {
+               comments.push(currentComment as ReviewComment);
+          }
+
+          // Determine overall rating
+          const hasCritical = comments.some((c) => c.severity === "critical");
+          const hasWarning = comments.some((c) => c.severity === "warning");
+
+          let overallRating: "approve" | "request_changes" | "comment";
+          if (hasCritical) {
+               overallRating = "request_changes";
+          } else if (hasWarning) {
+               overallRating = "comment";
+          } else {
+               overallRating = "approve";
+          }
+
+          return {
+               summary: content.substring(0, 200) + "...",
+               comments,
+               overallRating,
+          };
+     }
 }
