@@ -33,12 +33,18 @@ export class TreeSitterParser {
           return arrayOfFiles;
      }
 
-     private async getLanguage(moduleName: string) {
-          if (!this.loadedLanguages[moduleName]) {
+     private async getLanguage(moduleName: string, ext: string) {
+          const cacheKey = `${moduleName}-${ext}`;
+          if (!this.loadedLanguages[cacheKey]) {
                const mod = await import(moduleName);
-               this.loadedLanguages[moduleName] = mod.default || mod;
+               // TypeScript grammar needs .typescript property for .ts/.tsx files
+               if (moduleName === 'tree-sitter-typescript' && (ext === '.ts' || ext === '.tsx')) {
+                    this.loadedLanguages[cacheKey] = mod.typescript || mod.default;
+               } else {
+                    this.loadedLanguages[cacheKey] = mod.default || mod;
+               }
           }
-          return this.loadedLanguages[moduleName];
+          return this.loadedLanguages[cacheKey];
      }
 
      parseRepository = async (repoPath: string): Promise<ExtractedFeatures[]> => {
@@ -53,7 +59,7 @@ export class TreeSitterParser {
                if (!grammarModule) continue;
 
                try {
-                    const language = await this.getLanguage(grammarModule);
+                    const language = await this.getLanguage(grammarModule, ext);
                     treeSitterParser.setLanguage(language);
 
                     const sourceCode = fs.readFileSync(filePath, "utf8");

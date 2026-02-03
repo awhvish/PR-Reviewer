@@ -79,9 +79,14 @@ const app = async (probotApp: Probot, options: ApplicationFunctionOptions): Prom
 
   // PR event handler
   probotApp.on(["pull_request.opened", "pull_request.synchronize"], async (context) => {
+    console.log('>>> PR event received');
     try {
       await handlePullRequestEvent(context);
+      console.log('>>> PR event handled successfully');
     } catch (error) {
+      const err = error as Error;
+      console.error('>>> ERROR in index.ts catch:', err.message);
+      console.error('>>> Stack:', err.stack);
       log.error({ err: error }, "Error handling PR event");
     }
   });

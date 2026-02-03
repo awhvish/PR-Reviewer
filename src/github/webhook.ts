@@ -26,6 +26,7 @@ export async function handlePullRequestEvent(
   const parser = new RepositoryParser();
   const reviewGenerator = new ReviewGenerator(openaiProvider);
 
+  console.log('>>> handlePullRequestEvent called for PR', number);
   log.info({
     pr: number,
     repo: `${repoOwner}/${repoName}`,
@@ -45,12 +46,12 @@ export async function handlePullRequestEvent(
       return "Skipped: cost budget exceeded";
     }
 
-    const installationToken = await context.octokit.auth({
+    const auth = await context.octokit.auth({
       type: "installation",
-    });
+    }) as { token: string };
 
     // Clone into the repository
-    const repoPath = await repoCloner.cloneRepository(repoOwner, repoName, installationToken as string);
+    const repoPath = await repoCloner.cloneRepository(repoOwner, repoName, auth.token);
 
     if (!repoPath) {
       throw new Error("Failed to clone repository");

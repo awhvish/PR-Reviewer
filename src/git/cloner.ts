@@ -18,7 +18,7 @@ export class RepoCloner {
                 console.log(`Repo ${repoName} exists, pulling updates...`)
                 const git = simpleGit(repoPath);
                 await git.pull();
-                return;
+                return repoPath;
             }
             console.log(`Cloning  ${owner}/${repoName}...`);
             const git = simpleGit();
