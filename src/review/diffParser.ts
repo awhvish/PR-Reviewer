@@ -1,5 +1,5 @@
 import { Context } from "probot";
-import { ParsedDiff, DiffFile } from "./types";
+import { ParsedDiff, DiffFile } from "./types.js";
 
 export type { ParsedDiff, DiffFile };
 

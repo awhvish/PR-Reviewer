@@ -1,6 +1,6 @@
-import { LLMProvider } from "../llm/provider";
-import { ChatMessage } from "../llm/types";
-import { ParsedDiff, ReviewComment, GeneratedReview } from "./types";
+import { LLMProvider } from "../llm/provider.js";
+import { ChatMessage } from "../llm/types.js";
+import { ParsedDiff, ReviewComment, GeneratedReview } from "./types.js";
 
 export type { ReviewComment, GeneratedReview };
 

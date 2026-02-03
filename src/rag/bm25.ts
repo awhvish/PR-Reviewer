@@ -1,5 +1,5 @@
 import MiniSearch from 'minisearch';
-import { IndexedChunk } from './types';
+import { IndexedChunk } from './types.js';
 
 export type { IndexedChunk };
 

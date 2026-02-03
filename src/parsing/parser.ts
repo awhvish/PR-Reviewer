@@ -1,6 +1,6 @@
-import { treeSitterParser, ExtractedFeatures } from "./treeSitter";
-import { CallGraphBuilder, CallGraphNode } from "./callGraph";
-import { CodeChunker, CodeChunk } from "./codeChunker";
+import { treeSitterParser, ExtractedFeatures } from "./treeSitter.js";
+import { CallGraphBuilder, CallGraphNode } from "./callGraph.js";
+import { CodeChunker, CodeChunk } from "./codeChunker.js";
 
 export class RepositoryParser {
     private treeSitter = treeSitterParser;

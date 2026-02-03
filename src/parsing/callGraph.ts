@@ -1,5 +1,5 @@
 import path from "path";
-import { ExtractedFeatures, CallGraphNode } from "./types";
+import { ExtractedFeatures, CallGraphNode } from "./types.js";
 
 export type { CallGraphNode };
 

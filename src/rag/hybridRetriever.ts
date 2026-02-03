@@ -3,26 +3,43 @@
  * Returns formatted context ready for LLM consumption
  */
 
-import { queryRelevantCode } from "./vectorStore";
-import { bm25Search } from "./bm25";
-import { RetrievedChunk } from "./types";
+import { queryRelevantCode } from "./vectorStore.js";
+import { bm25Search } from "./bm25.js";
+import { RetrievedChunk } from "./types.js";
+import { loggers } from "../utils/logger.js";
+
+const log = loggers.rag;
 
 export type { RetrievedChunk };
 
 /**
  * Performs hybrid search and returns formatted RAG context string
  * Ready to be passed directly to generateReview()
+ * Falls back to keyword-only if ChromaDB is unavailable
  */
 export async function getHybridRagContext(
     query: string,
     vectorK: number = 10,
     keywordK: number = 10
 ): Promise<string> {
-    // Run both searches in parallel
-    const [vectorResults, keywordResults] = await Promise.all([
-        queryRelevantCode(query, vectorK),
-        Promise.resolve(bm25Search(query, keywordK))
-    ]);
+    let vectorResults = { documents: [] as string[], metadatas: [] as any[] };
+    let keywordResults: Array<{ id: string; text: string; filePath: string; functionName?: string; startLine?: number; endLine?: number; score: number }> = [];
+    let vectorAvailable = true;
+
+    // Try vector search with fallback
+    try {
+        vectorResults = await queryRelevantCode(query, vectorK);
+    } catch (error) {
+        vectorAvailable = false;
+        log.warn({ error: (error as Error).message }, 'ChromaDB unavailable, falling back to keyword-only search');
+    }
+
+    // Keyword search (always works if index exists)
+    try {
+        keywordResults = bm25Search(query, vectorAvailable ? keywordK : keywordK * 2);
+    } catch (error) {
+        log.warn({ error: (error as Error).message }, 'Keyword search failed');
+    }
 
     // Merge and deduplicate results
     const mergedChunks = mergeResults(vectorResults, keywordResults);
@@ -41,7 +58,12 @@ export async function getHybridRagContext(
         })
         .join('\n\n---\n\n');
 
-    console.log(`Hybrid retrieval: ${mergedChunks.length} unique chunks (vector: ${vectorResults.documents.length}, keyword: ${keywordResults.length})`);
+    log.info({
+        uniqueChunks: mergedChunks.length,
+        vectorResults: vectorResults.documents.length,
+        keywordResults: keywordResults.length,
+        vectorAvailable,
+    }, 'Hybrid retrieval completed');
 
     return ragContext;
 }

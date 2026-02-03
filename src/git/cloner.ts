@@ -1,7 +1,7 @@
-import SimpleGit from "simple-git";
+import { simpleGit } from "simple-git";
 import path from 'path';
 import fs from 'fs';
-import { cache } from './cache';
+import { cache } from './cache.js';
 
 export class RepoCloner {
     baseDir = "tmp/repositories/";
@@ -16,12 +16,12 @@ export class RepoCloner {
             
             if (await this.exists(repoPath)) {
                 console.log(`Repo ${repoName} exists, pulling updates...`)
-                const git = SimpleGit(repoPath);
+                const git = simpleGit(repoPath);
                 await git.pull();
                 return;
             }
             console.log(`Cloning  ${owner}/${repoName}...`);
-            const git = SimpleGit();
+            const git = simpleGit();
             const repoUrl = `https://x-access-token:${token}@github.com/${owner}/${repoName}.git`;
             await git.clone(repoUrl, repoPath);
 

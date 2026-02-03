@@ -1,5 +1,5 @@
 import { Context } from "probot";
-import { GeneratedReview } from "../review/generator";
+import { GeneratedReview } from "../review/generator.js";
 
 export class GitHubCommentsHandler {
   async postReview(
@@ -63,7 +63,7 @@ export class GitHubCommentsHandler {
     ['critical', 'warning', 'suggestion'].forEach(severity => {
       const comments = grouped[severity as keyof typeof grouped];
       if (comments.length > 0) {
-        comments.forEach((comment, index) => {
+        comments.forEach((comment) => {
           body += `${emoji[comment.severity]} **${comment.severity.toUpperCase()}** `;
           body += `(${comment.confidence}% confidence)\n\n`;
           body += `${comment.message.trim()}\n\n`;

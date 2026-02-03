@@ -2,7 +2,7 @@ import Parser from "tree-sitter";
 import fs from "fs";
 import path from "path";
 import { Query } from "tree-sitter";
-import { ImportInfo, FunctionInfo, ExtractedFeatures } from "./types";
+import { ImportInfo, FunctionInfo, ExtractedFeatures } from "./types.js";
 
 export type { ImportInfo, FunctionInfo, ExtractedFeatures };
 

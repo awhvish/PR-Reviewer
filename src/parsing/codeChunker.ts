@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { ExtractedFeatures, CallGraphNode, CodeChunk } from "./types";
+import { ExtractedFeatures, CallGraphNode, CodeChunk } from "./types.js";
 
 export type { CodeChunk };
 

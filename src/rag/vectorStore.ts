@@ -1,25 +1,46 @@
 import { ChromaClient, ChromaError } from "chromadb";
-import { CodeChunk } from "../parsing/types";
+import { CodeChunk } from "../parsing/types.js";
+import { loggers } from "../utils/logger.js";
 
+const log = loggers.rag;
 
-const client = new ChromaClient();
+const chromaUrl = process.env.CHROMADB_URL || "http://localhost:8000";
+const client = new ChromaClient({ path: chromaUrl });
 
-const initializeChroma = async (): Promise<any> => {
+let isConnected = false;
+
+/**
+ * Initialize and verify the vector store connection
+ */
+const initVectorStore = async (): Promise<void> => {
     try {
-        const collections = await client.getOrCreateCollection({
-            name: "pr-reviews"
-        });
-        return collections;
-    }
-    catch (error) {
-        if (error instanceof ChromaError) {
-            console.error("Chroma-specific error during initialization:", error.message);
+        log.info({ url: chromaUrl }, "Connecting to ChromaDB...");
+        
+        // Test connection with heartbeat
+        const heartbeat = await client.heartbeat();
+        
+        if (heartbeat) {
+            isConnected = true;
+            log.info({ heartbeat }, "ChromaDB connection established");
+            
+            // Ensure our collection exists
+            await client.getOrCreateCollection({ name: "pr-reviews" });
+            log.info("Collection 'pr-reviews' ready");
         } else {
-            console.error("General error during Chroma initialization:", (error as Error).message);
+            throw new Error("ChromaDB heartbeat failed");
         }
+    } catch (error) {
+        isConnected = false;
+        const message = error instanceof Error ? error.message : "Unknown error";
+        log.error({ error: message, url: chromaUrl }, "Failed to connect to ChromaDB");
+        throw error;
     }
-}
+};
 
+/**
+ * Check if vector store is connected
+ */
+const isVectorStoreConnected = (): boolean => isConnected;
 
 const storeDocuments = async (documents: Array<CodeChunk>): Promise<void> => {
     try {
@@ -44,17 +65,16 @@ const storeDocuments = async (documents: Array<CodeChunk>): Promise<void> => {
             ids: ids
         });
 
-        console.log(`Successfully stored ${documents.length} documents in ChromaDB.`);
+        log.info({ count: documents.length }, "Successfully stored documents in ChromaDB");
     } catch (error) {
         if (error instanceof ChromaError) {
-            console.error("Chroma-specific error during document storage:", error.message);
+            log.error({ error: error.message }, "Chroma-specific error during document storage");
         } else {
-            console.error("General error during document storage:", (error as Error).message);
+            log.error({ error: (error as Error).message }, "General error during document storage");
         }
+        throw error;
     }
 }
-
-// Add to /home/awhvish/Desktop/PR-Reviewer/src/rag/vectorStore.ts
 
 const queryRelevantCode = async (queryText: string, nResults: number = 10): Promise<{
     documents: string[];
@@ -75,10 +95,9 @@ const queryRelevantCode = async (queryText: string, nResults: number = 10): Prom
             metadatas: results.metadatas?.[0] || [],
         };
     } catch (error) {
-        console.error("Error querying ChromaDB:", (error as Error).message);
+        log.error({ error: (error as Error).message }, "Error querying ChromaDB");
         return { documents: [], metadatas: [] };
     }
 };
 
-export { storeDocuments, queryRelevantCode };
-
+export { storeDocuments, queryRelevantCode, initVectorStore, isVectorStoreConnected };

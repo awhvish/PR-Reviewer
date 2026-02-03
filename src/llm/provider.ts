@@ -1,4 +1,4 @@
-import { ChatMessage, ChatOptions, ChatResponse } from "./types";
+import { ChatMessage, ChatOptions, ChatResponse } from "./types.js";
 
 export type { ChatMessage, ChatOptions, ChatResponse };
 
