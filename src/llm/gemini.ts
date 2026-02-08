@@ -45,14 +45,14 @@ export class GeminiProvider extends LLMProvider {
         parts: [{ text: m.content }]
       }));
 
-    // Build the prompt with system instruction
+    // Build the prompt with system instruction in Content format
     const chat = model.startChat({
       history: chatMessages.slice(0, -1) as any,
       generationConfig: {
         maxOutputTokens: options.maxTokens || 1000,
         temperature: options.temperature || 0.1,
       },
-      systemInstruction: systemMessage?.content,
+      systemInstruction: systemMessage ? { role: 'user', parts: [{ text: systemMessage.content }] } : undefined,
     });
 
     const lastMessage = chatMessages[chatMessages.length - 1];

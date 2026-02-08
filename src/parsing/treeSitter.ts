@@ -38,15 +38,16 @@ export class TreeSitterParser {
           if (!this.loadedLanguages[cacheKey]) {
                const mod = await import(moduleName);
                
-               // tree-sitter-typescript exports { typescript, tsx } directly
+               // tree-sitter-typescript is wrapped in default export when using dynamic import
                if (moduleName === 'tree-sitter-typescript') {
+                    const tsModule = mod.default || mod;
                     if (ext === '.tsx') {
-                         this.loadedLanguages[cacheKey] = mod.tsx;
+                         this.loadedLanguages[cacheKey] = tsModule.tsx;
                     } else {
-                         this.loadedLanguages[cacheKey] = mod.typescript;
+                         this.loadedLanguages[cacheKey] = tsModule.typescript;
                     }
                } else {
-                    // Other grammars export default
+                    // Other grammars export default directly
                     this.loadedLanguages[cacheKey] = mod.default || mod;
                }
           }
