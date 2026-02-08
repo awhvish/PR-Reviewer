@@ -34,6 +34,9 @@ class LRUCache  {
             }
             
             console.log(`Evicted ${reposToDelete} repositories from cache`);
+            
+            // Clean up empty owner directories
+            await this.cleanupEmptyOwnerDirs();
         } catch (error) {
             console.error("Error evicting old repositories:", error);
             throw error;
@@ -71,20 +74,33 @@ class LRUCache  {
         const repos: { path: string; accessTime: Date }[] = [];
         
         try {
-            const entries = await fs.readdir(this.baseDir);
+            // First level: owner directories
+            const owners = await fs.readdir(this.baseDir);
             
-            for (const entry of entries) {
-                const repoPath = path.join(this.baseDir, entry);
+            for (const owner of owners) {
+                const ownerPath = path.join(this.baseDir, owner);
                 try {
-                    const stats = await fs.stat(repoPath);
-                    if (stats.isDirectory()) {
-                        repos.push({
-                            path: repoPath,
-                            accessTime: stats.atime
-                        });
+                    const ownerStats = await fs.stat(ownerPath);
+                    if (!ownerStats.isDirectory()) continue;
+                    
+                    // Second level: repo directories under each owner
+                    const repoNames = await fs.readdir(ownerPath);
+                    for (const repoName of repoNames) {
+                        const repoPath = path.join(ownerPath, repoName);
+                        try {
+                            const stats = await fs.stat(repoPath);
+                            if (stats.isDirectory()) {
+                                repos.push({
+                                    path: repoPath,
+                                    accessTime: stats.atime
+                                });
+                            }
+                        } catch (error) {
+                            console.warn(`Could not access ${repoPath}:`, error);
+                        }
                     }
                 } catch (error) {
-                    console.warn(`Could not access ${repoPath}:`, error);
+                    console.warn(`Could not access ${ownerPath}:`, error);
                 }
             }
             
@@ -93,6 +109,32 @@ class LRUCache  {
         } catch (error) {
             console.error("Error getting repositories by access time:", error);
             return [];
+        }
+    }
+
+    /**
+     * Clean up empty owner directories after evicting repos
+     */
+    private async cleanupEmptyOwnerDirs(): Promise<void> {
+        try {
+            const owners = await fs.readdir(this.baseDir);
+            for (const owner of owners) {
+                const ownerPath = path.join(this.baseDir, owner);
+                try {
+                    const stats = await fs.stat(ownerPath);
+                    if (stats.isDirectory()) {
+                        const contents = await fs.readdir(ownerPath);
+                        if (contents.length === 0) {
+                            await fs.rmdir(ownerPath);
+                            console.log(`Removed empty owner directory: ${owner}`);
+                        }
+                    }
+                } catch (error) {
+                    // Ignore errors during cleanup
+                }
+            }
+        } catch (error) {
+            // Ignore errors during cleanup
         }
     }
 }
