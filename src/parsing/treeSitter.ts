@@ -37,10 +37,16 @@ export class TreeSitterParser {
           const cacheKey = `${moduleName}-${ext}`;
           if (!this.loadedLanguages[cacheKey]) {
                const mod = await import(moduleName);
-               // TypeScript grammar needs .typescript property for .ts/.tsx files
-               if (moduleName === 'tree-sitter-typescript' && (ext === '.ts' || ext === '.tsx')) {
-                    this.loadedLanguages[cacheKey] = mod.typescript || mod.default;
+               
+               // tree-sitter-typescript exports { typescript, tsx } directly
+               if (moduleName === 'tree-sitter-typescript') {
+                    if (ext === '.tsx') {
+                         this.loadedLanguages[cacheKey] = mod.tsx;
+                    } else {
+                         this.loadedLanguages[cacheKey] = mod.typescript;
+                    }
                } else {
+                    // Other grammars export default
                     this.loadedLanguages[cacheKey] = mod.default || mod;
                }
           }
