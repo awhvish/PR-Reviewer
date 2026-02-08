@@ -74,8 +74,9 @@ export class TreeSitterParser {
                     
                     allFeatures.push(features);
                     console.log(`✅ Parsed ${path.basename(filePath)}`);
-               } catch (err) {
-                    console.error(`❌ Error parsing ${filePath}:`, err);
+               } catch (err: any) {
+                    const errorMsg = err.message || String(err);
+                    console.error(`Failed to parse ${path.relative(repoPath, filePath)}: ${errorMsg}`);
                }
           }
 

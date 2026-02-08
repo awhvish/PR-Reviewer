@@ -1,4 +1,6 @@
 import { ChromaClient, ChromaError } from "chromadb";
+import { OpenAI } from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { CodeChunk } from "../parsing/types.js";
 import { loggers } from "../utils/logger.js";
 
@@ -7,6 +9,36 @@ const log = loggers.rag;
 const chromaUrl = process.env.CHROMADB_URL || "http://localhost:8000";
 const client = new ChromaClient({ path: chromaUrl });
 
+// Determine which provider to use
+const useGemini = !!process.env.GEMINI_API_KEY;
+const providerName = useGemini ? "Gemini" : "OpenAI";
+
+// OpenAI client (fallback)
+const openai = process.env.OPENAI_API_KEY 
+    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    : null;
+
+// Gemini client (preferred)
+const gemini = process.env.GEMINI_API_KEY 
+    ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+    : null;
+
+const generateEmbedding = async (text: string): Promise<number[]> => {
+    if (useGemini && gemini) {
+        const model = gemini.getGenerativeModel({ model: "text-embedding-004" });
+        const result = await model.embedContent(text);
+        return result.embedding.values;
+    } else if (openai) {
+        const response = await openai.embeddings.create({
+            model: "text-embedding-3-small",
+            input: text,
+        });
+        return response.data[0].embedding;
+    } else {
+        throw new Error("No embedding provider configured. Set GEMINI_API_KEY or OPENAI_API_KEY");
+    }
+};
+
 let isConnected = false;
 
 /**
@@ -14,7 +46,7 @@ let isConnected = false;
  */
 const initVectorStore = async (): Promise<void> => {
     try {
-        log.info({ url: chromaUrl }, "Connecting to ChromaDB...");
+        log.info({ url: chromaUrl, embeddingProvider: providerName }, "Connecting to ChromaDB...");
         
         // Test connection with heartbeat
         const heartbeat = await client.heartbeat();
@@ -24,7 +56,9 @@ const initVectorStore = async (): Promise<void> => {
             log.info({ heartbeat }, "ChromaDB connection established");
             
             // Ensure our collection exists
-            await client.getOrCreateCollection({ name: "pr-reviews" });
+            await client.getOrCreateCollection({ 
+                name: "pr-reviews"
+            });
             log.info("Collection 'pr-reviews' ready");
         } else {
             throw new Error("ChromaDB heartbeat failed");
@@ -44,7 +78,9 @@ const isVectorStoreConnected = (): boolean => isConnected;
 
 const storeDocuments = async (documents: Array<CodeChunk>): Promise<void> => {
     try {
-        const collection = await client.getOrCreateCollection({ name: "pr-reviews" });
+        const collection = await client.getOrCreateCollection({ 
+            name: "pr-reviews"
+        });
 
         const texts = documents.map(doc => doc.text);
         const metadatas = documents.map(doc => ({
@@ -58,11 +94,16 @@ const storeDocuments = async (documents: Array<CodeChunk>): Promise<void> => {
             incomingCount: doc.metadata.incomingCount
         }));
         const ids = documents.map(doc => doc.id);
+        
+        // Generate embeddings for all documents
+        log.info({ count: texts.length }, "Generating embeddings...");
+        const embeddings = await Promise.all(texts.map(text => generateEmbedding(text)));
 
         await collection.add({
             documents: texts,
             metadatas: metadatas,
-            ids: ids
+            ids: ids,
+            embeddings: embeddings
         });
 
         log.info({ count: documents.length }, "Successfully stored documents in ChromaDB");
@@ -81,10 +122,15 @@ const queryRelevantCode = async (queryText: string, nResults: number = 10): Prom
     metadatas: any[];
 }> => {
     try {
-        const collection = await client.getOrCreateCollection({ name: "pr-reviews" });
+        const collection = await client.getOrCreateCollection({ 
+            name: "pr-reviews"
+        });
+        
+        // Generate embedding for query
+        const queryEmbedding = await generateEmbedding(queryText);
         
         const results = await collection.query({
-            queryTexts: [queryText],
+            queryEmbeddings: [queryEmbedding],
             nResults,
         });
         if (!results || !results.documents) {
