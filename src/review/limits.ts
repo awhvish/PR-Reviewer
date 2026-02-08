@@ -15,10 +15,10 @@ export interface PRLimits {
 }
 
 export const DEFAULT_LIMITS: PRLimits = {
-    maxFiles: 50,
-    maxAdditions: 2000,
-    maxDeletions: 1500,
-    maxTotalChanges: 3000,
+    maxFiles: 500,
+    maxAdditions: 50000,
+    maxDeletions: 50000,
+    maxTotalChanges: 100000,
 };
 
 export interface LimitCheckResult {
