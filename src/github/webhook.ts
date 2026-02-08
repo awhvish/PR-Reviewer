@@ -1,5 +1,7 @@
 import { Context } from "probot";
 import { openaiProvider } from "../llm/openai.js";
+import { geminiProvider } from "../llm/gemini.js";
+import { LLMProvider } from "../llm/provider.js";
 import { diffParser } from "../review/diffParser.js";
 import { ReviewGenerator } from "../review/generator.js";
 import { githubCommentsHandler } from "./comments.js";
@@ -24,8 +26,12 @@ export async function handlePullRequestEvent(
   const number = context.payload.pull_request.number;
   const prTitle = context.payload.pull_request.title;
   const parser = new RepositoryParser();
-  const reviewGenerator = new ReviewGenerator(openaiProvider);
+  
+  // Use Gemini if available, otherwise fall back to OpenAI
+  const llmProvider: LLMProvider = process.env.GEMINI_API_KEY ? geminiProvider : openaiProvider;
+  const reviewGenerator = new ReviewGenerator(llmProvider);
 
+  console.log('>>> handlePullRequestEvent called for PR', number);
   log.info({
     pr: number,
     repo: `${repoOwner}/${repoName}`,
@@ -45,12 +51,12 @@ export async function handlePullRequestEvent(
       return "Skipped: cost budget exceeded";
     }
 
-    const installationToken = await context.octokit.auth({
+    const auth = await context.octokit.auth({
       type: "installation",
-    });
+    }) as { token: string };
 
     // Clone into the repository
-    const repoPath = await repoCloner.cloneRepository(repoOwner, repoName, installationToken as string);
+    const repoPath = await repoCloner.cloneRepository(repoOwner, repoName, auth.token);
 
     if (!repoPath) {
       throw new Error("Failed to clone repository");
@@ -161,13 +167,7 @@ export async function handlePullRequestEvent(
       errorStack: err.stack,
     }, 'Error in PR review');
     
-    await context.octokit.rest.issues.createComment({
-      owner: repoOwner,
-      repo: repoName,
-      issue_number: number,
-      body: "Sorry, I encountered an error while reviewing this PR. Please try again.",
-    });
-    
+    // Don't post comment here - let index.ts handle it after logging
     throw error;
   }
 }

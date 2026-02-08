@@ -28,8 +28,9 @@ export class CodeChunker {
                     }
                 }
 
+                const uniqueKey = `${file.filePath}::${func.name}::${func.startLine}::${func.endLine}`;
                 chunks.push({
-                    id: crypto.createHash('md5').update(nodeId).digest('hex'),
+                    id: crypto.createHash('md5').update(uniqueKey).digest('hex'),
                     text: func.code,
                     context: contextParts.join('\n'),
                     filePath: file.filePath,

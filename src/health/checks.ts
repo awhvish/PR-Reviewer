@@ -9,14 +9,17 @@ const log = loggers.health;
 
 export interface HealthCheckResult {
     status: 'healthy' | 'degraded' | 'unhealthy';
+    llmProvider: 'gemini' | 'openai' | 'none';
     checks: {
         chroma: boolean;
         openai: boolean;
+        gemini: boolean;
         github: boolean;
     };
     details: {
         chroma?: string;
         openai?: string;
+        gemini?: string;
         github?: string;
     };
     timestamp: string;
@@ -71,6 +74,29 @@ export async function checkOpenAIHealth(): Promise<{ healthy: boolean; message: 
 }
 
 /**
+ * Check Gemini API health (lightweight check)
+ */
+export async function checkGeminiHealth(): Promise<{ healthy: boolean; message: string }> {
+    try {
+        const apiKey = process.env.GEMINI_API_KEY;
+        
+        if (!apiKey) {
+            return { healthy: false, message: 'GEMINI_API_KEY not configured' };
+        }
+
+        // Just check if key exists and has reasonable length
+        if (apiKey.length > 20) {
+            return { healthy: true, message: 'Gemini API key configured (ACTIVE)' };
+        }
+
+        return { healthy: false, message: 'Invalid Gemini API key format' };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return { healthy: false, message: `Gemini check failed: ${message}` };
+    }
+}
+
+/**
  * Check GitHub App configuration
  */
 export async function checkGitHubHealth(): Promise<{ healthy: boolean; message: string }> {
@@ -97,39 +123,52 @@ export async function checkGitHubHealth(): Promise<{ healthy: boolean; message: 
  * Run all health checks
  */
 export async function runHealthChecks(): Promise<HealthCheckResult> {
-    const [chromaResult, openaiResult, githubResult] = await Promise.all([
+    const [chromaResult, openaiResult, geminiResult, githubResult] = await Promise.all([
         checkChromaHealth(),
         checkOpenAIHealth(),
+        checkGeminiHealth(),
         checkGitHubHealth(),
     ]);
 
     const checks = {
         chroma: chromaResult.healthy,
         openai: openaiResult.healthy,
+        gemini: geminiResult.healthy,
         github: githubResult.healthy,
     };
 
     const details = {
         chroma: chromaResult.message,
         openai: openaiResult.message,
+        gemini: geminiResult.message,
         github: githubResult.message,
     };
 
-    // Determine overall status
-    const allHealthy = Object.values(checks).every(Boolean);
-    const allUnhealthy = Object.values(checks).every(v => !v);
+    // Determine which LLM provider is active (Gemini takes priority)
+    let llmProvider: 'gemini' | 'openai' | 'none' = 'none';
+    if (geminiResult.healthy) {
+        llmProvider = 'gemini';
+    } else if (openaiResult.healthy) {
+        llmProvider = 'openai';
+    }
+
+    // Determine overall status (need at least one LLM + GitHub)
+    const hasLLM = checks.gemini || checks.openai;
+    const coreHealthy = hasLLM && checks.github;
+    const allHealthy = coreHealthy && checks.chroma;
     
     let status: 'healthy' | 'degraded' | 'unhealthy';
     if (allHealthy) {
         status = 'healthy';
-    } else if (allUnhealthy) {
-        status = 'unhealthy';
+    } else if (coreHealthy) {
+        status = 'degraded'; // ChromaDB down but can still work
     } else {
-        status = 'degraded';
+        status = 'unhealthy';
     }
 
     const result: HealthCheckResult = {
         status,
+        llmProvider,
         checks,
         details,
         timestamp: new Date().toISOString(),
@@ -138,6 +177,7 @@ export async function runHealthChecks(): Promise<HealthCheckResult> {
 
     log.info({
         status,
+        llmProvider,
         checks,
     }, 'Health check completed');
 

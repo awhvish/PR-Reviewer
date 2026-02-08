@@ -33,12 +33,25 @@ export class TreeSitterParser {
           return arrayOfFiles;
      }
 
-     private async getLanguage(moduleName: string) {
-          if (!this.loadedLanguages[moduleName]) {
+     private async getLanguage(moduleName: string, ext: string) {
+          const cacheKey = `${moduleName}-${ext}`;
+          if (!this.loadedLanguages[cacheKey]) {
                const mod = await import(moduleName);
-               this.loadedLanguages[moduleName] = mod.default || mod;
+               
+               // tree-sitter-typescript is wrapped in default export when using dynamic import
+               if (moduleName === 'tree-sitter-typescript') {
+                    const tsModule = mod.default || mod;
+                    if (ext === '.tsx') {
+                         this.loadedLanguages[cacheKey] = tsModule.tsx;
+                    } else {
+                         this.loadedLanguages[cacheKey] = tsModule.typescript;
+                    }
+               } else {
+                    // Other grammars export default directly
+                    this.loadedLanguages[cacheKey] = mod.default || mod;
+               }
           }
-          return this.loadedLanguages[moduleName];
+          return this.loadedLanguages[cacheKey];
      }
 
      parseRepository = async (repoPath: string): Promise<ExtractedFeatures[]> => {
@@ -53,7 +66,7 @@ export class TreeSitterParser {
                if (!grammarModule) continue;
 
                try {
-                    const language = await this.getLanguage(grammarModule);
+                    const language = await this.getLanguage(grammarModule, ext);
                     treeSitterParser.setLanguage(language);
 
                     const sourceCode = fs.readFileSync(filePath, "utf8");
@@ -68,8 +81,9 @@ export class TreeSitterParser {
                     
                     allFeatures.push(features);
                     console.log(`✅ Parsed ${path.basename(filePath)}`);
-               } catch (err) {
-                    console.error(`❌ Error parsing ${filePath}:`, err);
+               } catch (err: any) {
+                    const errorMsg = err.message || String(err);
+                    console.error(`Failed to parse ${path.relative(repoPath, filePath)}: ${errorMsg}`);
                }
           }
 

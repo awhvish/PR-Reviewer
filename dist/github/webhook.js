@@ -18,6 +18,7 @@ export async function handlePullRequestEvent(context) {
     const prTitle = context.payload.pull_request.title;
     const parser = new RepositoryParser();
     const reviewGenerator = new ReviewGenerator(openaiProvider);
+    console.log('>>> handlePullRequestEvent called for PR', number);
     log.info({
         pr: number,
         repo: `${repoOwner}/${repoName}`,
@@ -108,7 +109,16 @@ export async function handlePullRequestEvent(context) {
         return review.summary;
     }
     catch (error) {
-        log.error({ error, pr: number }, 'Error in PR review');
+        const err = error;
+        // Log synchronously to ensure we see the error before any crash
+        console.error('PR Review Error:', err.message);
+        console.error('Stack:', err.stack);
+        log.error({
+            err,
+            pr: number,
+            errorMessage: err.message,
+            errorStack: err.stack,
+        }, 'Error in PR review');
         await context.octokit.rest.issues.createComment({
             owner: repoOwner,
             repo: repoName,

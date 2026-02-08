@@ -77,12 +77,44 @@ const app = async (probotApp: Probot, options: ApplicationFunctionOptions): Prom
 
   logger.info("📊 Health endpoints registered: /health, /costs");
 
+  // Deduplication tracking
+  const processingPRs = new Set<string>();
+
   // PR event handler
   probotApp.on(["pull_request.opened", "pull_request.synchronize"], async (context) => {
+    const prKey = `${context.payload.repository.full_name}#${context.payload.pull_request.number}`;
+    
+    // Deduplicate concurrent requests
+    if (processingPRs.has(prKey)) {
+      log.info({ pr: context.payload.pull_request.number }, 'PR already being processed, skipping duplicate');
+      return;
+    }
+    
+    processingPRs.add(prKey);
+    console.log('>>> PR event received');
+    
     try {
       await handlePullRequestEvent(context);
+      console.log('>>> PR event handled successfully');
     } catch (error) {
+      const err = error as Error;
+      console.error('>>> ERROR in index.ts catch:', err.message);
+      console.error('>>> Stack:', err.stack);
       log.error({ err: error }, "Error handling PR event");
+      
+      // Post error comment after logging
+      try {
+        await context.octokit.rest.issues.createComment({
+          owner: context.payload.repository.owner.login,
+          repo: context.payload.repository.name,
+          issue_number: context.payload.pull_request.number,
+          body: "Sorry, I encountered an error while reviewing this PR. Please try again.",
+        });
+      } catch (commentError) {
+        log.error({ err: commentError }, "Failed to post error comment");
+      }
+    } finally {
+      processingPRs.delete(prKey);
     }
   });
 };

@@ -7,27 +7,37 @@ import { loggers } from "../utils/logger.js";
 const log = loggers.llm;
 
 export class OpenAIProvider extends LLMProvider {
-  private client: OpenAI;
+  private _client: OpenAI | null = null;
 
   constructor() {
     super();
-    
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error("Missing OPENAI_API_KEY environment variable");
+  }
+
+  /**
+   * Lazy initialization of OpenAI client
+   * Only throws if API key is missing when client is actually needed
+   */
+  private getClient(): OpenAI {
+    if (!this._client) {
+      if (!process.env.OPENAI_API_KEY) {
+        throw new Error("Missing OPENAI_API_KEY environment variable");
+      }
+      
+      this._client = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      });
     }
-    
-    this.client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
+    return this._client;
   }
 
   async chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<ChatResponse> {
+    const client = this.getClient();
     const model = options.model || "gpt-4o";
     const startTime = Date.now();
 
     log.info({ model, messageCount: messages.length }, 'Starting chat completion');
 
-    const response = await this.client.chat.completions.create({
+    const response = await client.chat.completions.create({
       model,
       messages,
       max_tokens: options.maxTokens || 1000,
@@ -64,10 +74,11 @@ export class OpenAIProvider extends LLMProvider {
   }
 
   async embed(text: string): Promise<number[]> {
+    const client = this.getClient();
     const model = "text-embedding-3-small";
     const startTime = Date.now();
 
-    const response = await this.client.embeddings.create({
+    const response = await client.embeddings.create({
       model,
       input: text,
     });

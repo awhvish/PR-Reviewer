@@ -18,7 +18,7 @@ export class RepoCloner {
                 console.log(`Repo ${repoName} exists, pulling updates...`)
                 const git = simpleGit(repoPath);
                 await git.pull();
-                return;
+                return repoPath;
             }
             console.log(`Cloning  ${owner}/${repoName}...`);
             const git = simpleGit();
@@ -27,7 +27,16 @@ export class RepoCloner {
 
             return repoPath;
 
-        }  catch (error) {
+        }  catch (error: any) {
+            // Handle race condition: if clone fails because dir exists, try pulling instead
+            if (error.message?.includes('already exists')) {
+                console.log(`Directory exists after race, attempting pull instead...`);
+                if (await this.exists(repoPath)) {
+                    const git = simpleGit(repoPath);
+                    await git.pull();
+                    return repoPath;
+                }
+            }
             console.log(`ERROR: Failed to clone ${owner}/${repoName}: `, error)
             throw error;
         }
