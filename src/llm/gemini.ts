@@ -92,7 +92,7 @@ export class GeminiProvider extends LLMProvider {
 
   async embed(text: string): Promise<number[]> {
     const client = this.getClient();
-    const modelName = "embedding-001";
+    const modelName = "gemini-embedding-001";
     const startTime = Date.now();
 
     const model = client.getGenerativeModel({ model: modelName });

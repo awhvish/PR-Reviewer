@@ -25,7 +25,7 @@ const gemini = process.env.GEMINI_API_KEY
 
 const generateEmbedding = async (text: string): Promise<number[]> => {
     if (useGemini && gemini) {
-        const model = gemini.getGenerativeModel({ model: "embedding-001" });
+        const model = gemini.getGenerativeModel({ model: "gemini-embedding-001" });
         const result = await model.embedContent(text);
         return result.embedding.values;
     } else if (openai) {
